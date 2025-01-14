@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Real-time Sensor Data with Charts</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .status { margin: 10px 0; padding: 10px; background: #f0f0f0; }
+        .error { color: red; }
+        .data { font-size: 1.2em; margin-top: 20px; }
+        .chart-container { width: 100%; max-width: 600px; margin: 20px auto; }
+    </style>
+</head>
+<body>
+    <h1>Accelerometer and Gyroscope Data</h1>
+    <div id="status" class="status">Waiting for sensors...</div>
+    <button onclick="requestSensorPermissions()">Start Sensors</button>
+
+    <div class="data">
+        <h2>Accelerometer</h2>
+        <p>X: <span id="acc-x">-</span></p>
+        <p>Y: <span id="acc-y">-</span></p>
+        <p>Z: <span id="acc-z">-</span></p>
+    </div>
+    <div class="data">
+        <h2>Gyroscope</h2>
+        <p>Alpha (Z): <span id="gyro-alpha">-</span></p>
+        <p>Beta (X): <span id="gyro-beta">-</span></p>
+        <p>Gamma (Y): <span id="gyro-gamma">-</span></p>
+    </div>
+
+    <div class="chart-container">
+        <h2>Accelerometer Data</h2>
+        <canvas id="accelerometerChart"></canvas>
+    </div>
+    <div class="chart-container">
+        <h2>Gyroscope Data</h2>
+        <canvas id="gyroscopeChart"></canvas>
+    </div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+
+        function updateStatus(message, isError = false) {
+            statusDiv.textContent = message;
+            statusDiv.className = isError ? 'status error' : 'status';
+            console.log(message);
+        }
+
+        // Initialize Accelerometer Chart
+        const accelCtx = document.getElementById('accelerometerChart').getContext('2d');
+        const accelerometerChart = new Chart(accelCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'X', data: [], borderColor: 'red', fill: false },
+                    { label: 'Y', data: [], borderColor: 'green', fill: false },
+                    { label: 'Z', data: [], borderColor: 'blue', fill: false }
+                ]
+            },
+            options: {
+                animation: false,
+                scales: {
+                    x: { display: true, title: { display: true, text: 'Time' } },
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+
+        // Initialize Gyroscope Chart
+        const gyroCtx = document.getElementById('gyroscopeChart').getContext('2d');
+        const gyroscopeChart = new Chart(gyroCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'Alpha', data: [], borderColor: 'orange', fill: false },
+                    { label: 'Beta', data: [], borderColor: 'purple', fill: false },
+                    { label: 'Gamma', data: [], borderColor: 'yellow', fill: false }
+                ]
+            },
+            options: {
+                animation: false,
+                scales: {
+                    x: { display: true, title: { display: true, text: 'Time' } },
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+
+        async function requestSensorPermissions() {
+            updateStatus('Requesting sensor permissions...');
+
+            try {
+                // Request Accelerometer permission
+                const accelPermission = await navigator.permissions.query({ name: 'accelerometer' });
+                if (accelPermission.state === 'granted') {
+                    console.log('Accelerometer permission granted.');
+                } else if (accelPermission.state === 'prompt') {
+                    console.log('Accelerometer permission prompt.');
+                } else {
+                    updateStatus('Accelerometer permission denied.', true);
+                    return;
+                }
+
+                // Request Gyroscope permission
+                const gyroPermission = await navigator.permissions.query({ name: 'gyroscope' });
+                if (gyroPermission.state === 'granted') {
+                    console.log('Gyroscope permission granted.');
+                } else if (gyroPermission.state === 'prompt') {
+                    console.log('Gyroscope permission prompt.');
+                } else {
+                    updateStatus('Gyroscope permission denied.', true);
+                    return;
+                }
+
+                // Start sensors after permissions are handled
+                startSensors();
+            } catch (error) {
+                console.error('Permission API error:', error);
+                updateStatus(`Permission request error: ${error}`, true);
+            }
+        }
+
+        function startSensors() {
+            updateStatus('Starting sensors...');
+
+            // Initialize Generic Sensors if supported
+            if ('Accelerometer' in window && 'Gyroscope' in window) {
+                try {
+                    const accelerometer = new Accelerometer({ frequency: 60 });
+                    accelerometer.addEventListener('reading', () => {
+                        document.getElementById('acc-x').textContent = accelerometer.x.toFixed(3);
+                        document.getElementById('acc-y').textContent = accelerometer.y.toFixed(3);
+                        document.getElementById('acc-z').textContent = accelerometer.z.toFixed(3);
+
+                        const time = new Date().toLocaleTimeString();
+                        updateChart(accelerometerChart, time, [accelerometer.x, accelerometer.y, accelerometer.z]);
+                    });
+                    accelerometer.addEventListener('error', event => {
+                        updateStatus(`Accelerometer error: ${event.error.name}`, true);
+                    });
+                    accelerometer.start();
+                    updateStatus('Accelerometer started.');
+                } catch (error) {
+                    console.error('Accelerometer error:', error);
+                    updateStatus(`Accelerometer initialization error: ${error}`, true);
+                }
+
+                try {
+                    const gyroscope = new Gyroscope({ frequency: 60 });
+                    gyroscope.addEventListener('reading', () => {
+                        document.getElementById('gyro-alpha').textContent = gyroscope.alpha.toFixed(3);
+                        document.getElementById('gyro-beta').textContent = gyroscope.beta.toFixed(3);
+                        document.getElementById('gyro-gamma').textContent = gyroscope.gamma.toFixed(3);
+
+                        const time = new Date().toLocaleTimeString();
+                        updateChart(gyroscopeChart, time, [gyroscope.alpha, gyroscope.beta, gyroscope.gamma]);
+                    });
+                    gyroscope.addEventListener('error', event => {
+                        updateStatus(`Gyroscope error: ${event.error.name}`, true);
+                    });
+                    gyroscope.start();
+                    updateStatus('Gyroscope started.');
+                } catch (error) {
+                    console.error('Gyroscope error:', error);
+                    updateStatus(`Gyroscope initialization error: ${error}`, true);
+                }
+            } else {
+                // Fallback to DeviceMotionEvent and DeviceOrientationEvent
+                fallbackSensors();
+            }
+
+            // Timeout to check if sensors are providing data
+            setTimeout(() => {
+                if (statusDiv.textContent === 'Starting sensors...') {
+                    updateStatus('No sensor data received. Please ensure sensors are enabled in your browser settings.', true);
+                }
+            }, 5000);
+        }
+
+        function fallbackSensors() {
+            updateStatus('Using fallback sensor APIs.');
+
+            // Accelerometer using DeviceMotionEvent
+            if ('DeviceMotionEvent' in window) {
+                window.addEventListener('devicemotion', (event) => {
+                    const acc = event.accelerationIncludingGravity || event.acceleration;
+                    if (acc && (acc.x !== null || acc.y !== null || acc.z !== null)) {
+                        updateStatus('Receiving accelerometer data (DeviceMotionEvent)');
+                        document.getElementById('acc-x').textContent = acc.x.toFixed(3);
+                        document.getElementById('acc-y').textContent = acc.y.toFixed(3);
+                        document.getElementById('acc-z').textContent = acc.z.toFixed(3);
+
+                        const time = new Date().toLocaleTimeString();
+                        updateChart(accelerometerChart, time, [acc.x, acc.y, acc.z]);
+                    } else {
+                        console.log('No accelerometer data in this event.');
+                    }
+                }, { passive: true });
+            } else {
+                updateStatus('DeviceMotionEvent not supported.', true);
+            }
+
+            // Gyroscope using DeviceOrientationEvent
+            if ('DeviceOrientationEvent' in window) {
+                window.addEventListener('deviceorientation', (event) => {
+                    if (event.alpha !== null || event.beta !== null || event.gamma !== null) {
+                        updateStatus('Receiving gyroscope data (DeviceOrientationEvent)');
+                        document.getElementById('gyro-alpha').textContent = event.alpha.toFixed(3);
+                        document.getElementById('gyro-beta').textContent = event.beta.toFixed(3);
+                        document.getElementById('gyro-gamma').textContent = event.gamma.toFixed(3);
+
+                        const time = new Date().toLocaleTimeString();
+                        updateChart(gyroscopeChart, time, [event.alpha, event.beta, event.gamma]);
+                    } else {
+                        console.log('No gyroscope data in this event.');
+                    }
+                }, { passive: true });
+            } else {
+                updateStatus('DeviceOrientationEvent not supported.', true);
+            }
+        }
+
+        function updateChart(chart, label, data) {
+            chart.data.labels.push(label);
+            chart.data.datasets.forEach((dataset, index) => {
+                dataset.data.push(data[index]);
+            });
+            chart.update('none');
+
+            // Limit data points
+            if (chart.data.labels.length > 50) {
+                chart.data.labels.shift();
+                chart.data.datasets.forEach(dataset => dataset.data.shift());
+            }
+        }
+    </script>
+</body>
+</html>

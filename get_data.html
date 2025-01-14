@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sensor Data Logger</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        .status { margin: 10px 0; padding: 10px; background: #f0f0f0; }
+        .error { color: red; }
+        .data { font-size: 1.2em; margin-top: 20px; }
+        .prediction {
+            font-size: 1.5em;
+            margin: 20px;
+            padding: 10px;
+            background: #e0e0e0;
+        }
+        button { margin: 10px 5px; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Sensor Data Logger</h1>
+    <div id="status" class="status">Waiting for sensors...</div>
+    <button onclick="startSensors()">Start Sensors</button>
+    <button onclick="stopSensors()">Stop Sensors</button>
+    <button onclick="downloadData()">Download Data</button>
+    <div class="data">
+        <h2>Accelerometer</h2>
+        <p>X: <span id="acc-x">-</span></p>
+        <p>Y: <span id="acc-y">-</span></p>
+        <p>Z: <span id="acc-z">-</span></p>
+    </div>
+    <div class="data">
+        <h2>Gyroscope</h2>
+        <p>X: <span id="gyro-x">-</span></p>
+        <p>Y: <span id="gyro-y">-</span></p>
+        <p>Z: <span id="gyro-z">-</span></p>
+    </div>
+
+    <div class="prediction">
+        <h2>Current Activity:</h2>
+        <p id="activity">-</p>
+    </div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        let accData = [];
+        let gyroData = [];
+        let accelerometer, gyroscope;
+
+        function updateStatus(message, isError = false) {
+            statusDiv.textContent = message;
+            statusDiv.className = isError ? 'status error' : 'status';
+            console.log(message);
+        }
+
+        function startSensors() {
+            updateStatus('Starting sensors...');
+            accData = [];  // Reset data arrays
+            gyroData = [];
+            const socket = io();
+
+            try {
+                // Start Accelerometer
+                if ('Accelerometer' in window) {
+                    accelerometer = new Accelerometer({ frequency: 50 });
+                    accelerometer.addEventListener('reading', () => {
+                        document.getElementById('acc-x').textContent = accelerometer.x.toFixed(3);
+                        document.getElementById('acc-y').textContent = accelerometer.y.toFixed(3);
+                        document.getElementById('acc-z').textContent = accelerometer.z.toFixed(3);
+                        accData.push({
+                            timestamp: Date.now(),
+                            x: accelerometer.x.toFixed(3),
+                            y: accelerometer.y.toFixed(3),
+                            z: accelerometer.z.toFixed(3)
+                        });
+
+                        // Send combined data if gyroscope is active
+                        if (gyroscope && gyroscope.x) {
+                            socket.emit('sensor_data', {
+                                acc_x: accelerometer.x.toFixed(3),
+                                acc_y: accelerometer.y.toFixed(3),
+                                acc_z: accelerometer.z.toFixed(3),
+                                gyro_x: gyroscope.x.toFixed(3),
+                                gyro_y: gyroscope.y.toFixed(3),
+                                gyro_z: gyroscope.z.toFixed(3)
+                            });
+                        }
+                    });
+                    accelerometer.addEventListener('error', event => {
+                        updateStatus(`Accelerometer error: ${event.error.name}`, true);
+                    });
+                    accelerometer.start();
+                    updateStatus('Accelerometer started.');
+                } else {
+                    updateStatus('Accelerometer not supported.', true);
+                }
+
+                // Start Gyroscope
+                if ('Gyroscope' in window) {
+                    gyroscope = new Gyroscope({ frequency: 50 });
+                    gyroscope.addEventListener('reading', () => {
+                        document.getElementById('gyro-x').textContent = gyroscope.x.toFixed(3);
+                        document.getElementById('gyro-y').textContent = gyroscope.y.toFixed(3);
+                        document.getElementById('gyro-z').textContent = gyroscope.z.toFixed(3);
+                        gyroData.push({
+                            timestamp: Date.now(),
+                            x: gyroscope.x.toFixed(3),
+                            y: gyroscope.y.toFixed(3),
+                            z: gyroscope.z.toFixed(3)
+                        });
+                    });
+                    gyroscope.addEventListener('error', event => {
+                        updateStatus(`Gyroscope error: ${event.error.name}`, true);
+                    });
+                    gyroscope.start();
+                    updateStatus('Gyroscope started.');
+                } else {
+                    updateStatus('Gyroscope not supported.', true);
+                }
+            } catch (error) {
+                updateStatus(`Error starting sensors: ${error}`, true);
+                console.error(error);
+            }
+        }
+
+        function stopSensors() {
+            if (accelerometer) accelerometer.stop();
+            if (gyroscope) gyroscope.stop();
+            updateStatus('Sensors stopped.');
+        }
+
+        function downloadData() {
+            // Combine accelerometer and gyroscope data
+            const combinedData = accData.map((acc, index) => {
+                const gyro = gyroData[index] || {};
+                return {
+                    timestamp: acc.timestamp || gyro.timestamp,
+                    acc_x: acc.x || '',
+                    acc_y: acc.y || '',
+                    acc_z: acc.z || '',
+                    gyro_x: gyro.x || '',
+                    gyro_y: gyro.y || '',
+                    gyro_z: gyro.z || ''
+                };
+            });
+
+            // Convert to CSV format
+            const csvContent = [
+                'timestamp,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z',
+                ...combinedData.map(row => Object.values(row).join(','))
+            ].join('\n');
+
+            // Create a downloadable file
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'sensor_data.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+            updateStatus('Data downloaded.');
+        }
+
+        socket.on('prediction', function(data) {
+            document.getElementById('activity').textContent = data.activity;
+        });
+    </script>
+</body>
+</html>
