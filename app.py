@@ -31,6 +31,8 @@ activities = {
 # Global variables
 sensor_buffer = []
 last_received_time = time.time()
+last_prediction_time = 0  # Add this line
+PREDICTION_INTERVAL = 1  # seconds, adjust as needed
 buffer_lock = threading.Lock()
 
 # Configure logging
@@ -70,12 +72,16 @@ def handle_sensor_data(data):
         app.logger.error(f"Error processing sensor data: {e}", exc_info=True)
 
 def make_prediction():
-    global sensor_buffer
+    global sensor_buffer, last_prediction_time
     try:
+        current_time = time.time()
+        if current_time - last_prediction_time < PREDICTION_INTERVAL:
+            return  # Skip prediction if interval has not passed
+
         with buffer_lock:
             X = np.array(sensor_buffer)
 
-        app.logger.debug(f"Buffer before scaling: {X}")
+        # app.logger.debug(f"Buffer before scaling: {X}")
         X = scaler.transform(X)
         X = X.reshape(1, WINDOW_SIZE, 6)
 
