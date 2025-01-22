@@ -3,8 +3,13 @@
 <head>
     <title>Sensor Data Logger</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://kit.fontawesome.com/c69ae9cf94.js" crossorigin="anonymous"></script>
     <style>
-        .status { margin: 10px 0; padding: 10px; background: #f0f0f0; }
+        .status { margin: 10px 0; padding: 10px; background: #f0f0f0; 
+            border-radius: 25px;
+            border: 2px dotted;
+            padding: 20px;
+        }
         .error { color: red; }
         .data { font-size: 1.2em; margin-top: 20px; }
         .prediction {
@@ -12,16 +17,69 @@
             margin: 20px;
             padding: 10px;
             background: #e0e0e0;
+            background-color: #e5e5f7;
+            opacity: 0.8;
+            background-image: radial-gradient(#444cf7 0.5px, #e5e5f7 0.5px);
+            background-size: 10px 10px;
+            border-radius: 25px;
+            padding: 20px;
         }
-        button { margin: 10px 5px; padding: 10px; }
+        body {
+            background-color: #FEF9E1;
+        }
+        .button { 
+            margin: 10px 5px; 
+            padding: 10px; 
+            background-color: #FFCFCF; 
+            border: none;
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 13px;
+        }
+        .button:hover {
+            background-color: #FFE2E2; /* Dark grey */
+        }
+        h2, p {
+            color: #6D2323;
+        }
+        .heading {
+            font-family: "Arial Black", Gadget, sans-serif;
+            font-size: 37px;
+            letter-spacing: -1.6px;
+            word-spacing: 0px;
+            color: #6D2323;
+            font-weight: 700;
+            text-decoration: underline solid rgb(68, 68, 68);
+            font-style: italic;
+            font-variant: small-caps;
+            text-transform: capitalize;
+        }
+        .pred {
+            font-family: "Courier New", Courier, monospace;
+            font-size: 29px;
+            letter-spacing: -1.6px;
+            word-spacing: 0px;
+            color: #6D2323;
+            font-weight: 700;
+            text-decoration: underline solid rgb(68, 68, 68);
+            font-style: italic;
+            font-variant: small-caps;
+            text-transform: capitalize;
+        }
     </style>
 </head>
 <body>
-    <h1>Sensor Data Logger</h1>
+    <h1 class="heading">Sensor Data Logger</h1>
     <div id="status" class="status">Waiting for sensors...</div>
-    <button onclick="startSensors()">Start Sensors</button>
-    <button onclick="stopSensors()">Stop Sensors</button>
-    <button onclick="downloadData()">Download Data</button>
+    <i class="button fa-solid fa-play" style="color: #6D2323;" onclick="startSensors()"> Start Sensors</i>
+    <i class="button fa-solid fa-stop" style="color: #6D2323;" onclick="stopSensors()"> Stop Sensors</i>
+    <i class="button fa-solid fa-file-arrow-down" style="color: #6D2323;" onclick="downloadData()"> Download Data</i>
+    <i class="fa-solid fa-eye-slash" style="color: #6D2323;" onclick="hideSensorData()"></i>
+    <div id="myDIV">
     <div class="data">
         <h2>Accelerometer</h2>
         <p>X: <span id="acc-x">-</span></p>
@@ -34,9 +92,10 @@
         <p>Y: <span id="gyro-y">-</span></p>
         <p>Z: <span id="gyro-z">-</span></p>
     </div>
+    </div>
 
     <div class="prediction">
-        <h2>Current Activity:</h2>
+        <h2 class="pred">Current Activity:</h2>
         <p id="activity">-</p>
     </div>
 
@@ -147,6 +206,15 @@ function downloadData() {
     a.click();
     URL.revokeObjectURL(url);
     updateStatus("Data downloaded.");
+}
+
+function hideSensorData() {
+    var x = document.getElementById("myDIV");
+    if (x.style.display === "none") {
+      x.style.display = "block";
+    } else {
+      x.style.display = "none";
+    }
 }
 </script>
 </body>
