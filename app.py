@@ -4,9 +4,15 @@ import time
 import threading
 import numpy as np
 import tensorflow as tf
-from flask import Flask, render_template
-from flask_socketio import SocketIO
+from flask import Flask, render_template,request
+from flask_socketio import SocketIO 
 from sklearn.preprocessing import StandardScaler
+from collections import deque
+import json
+
+# Add after existing global variables
+activity_history = deque(maxlen=50)  # Store last 50 activities
+connected_devices = set()
 
 app = Flask(__name__)
 socketio = SocketIO(app)
@@ -15,7 +21,7 @@ socketio = SocketIO(app)
 WINDOW_SIZE = 128
 TIMEOUT = 3  # seconds
 MODEL_PATH = 'CNN_BiLSTM.h5'
-PREDICTION_INTERVAL = 0.25  # seconds
+PREDICTION_INTERVAL = 1  # seconds
 
 # Activity labels mapping
 activities = {
@@ -77,6 +83,11 @@ def index():
     logger.info("Rendering 'get_data.html'")
     return render_template('get_data.html')
 
+@app.route('/dashboard')
+def dashboard():
+    """PC dashboard view"""
+    return render_template('dashboard.html')
+
 @socketio.on('sensor_data')
 def handle_sensor_data(data):
     global sensor_buffer, last_received_time
@@ -101,6 +112,12 @@ def handle_sensor_data(data):
         # Check buffer size for prediction
         if len(sensor_buffer) == WINDOW_SIZE:
             make_prediction()
+            # Update dashboard - removed broadcast parameter
+        socketio.emit('dashboard_sensor_update', {
+            'acc': [data.get('acc_x', 0), data.get('acc_y', 0), data.get('acc_z', 0)],
+            'gyro': [data.get('gyro_x', 0), data.get('gyro_y', 0), data.get('gyro_z', 0)]
+        })
+
 
     except Exception as e:
         logger.error(f"Error processing sensor data: {e}", exc_info=True)
@@ -144,6 +161,19 @@ def make_prediction():
         
         last_prediction_time = current_time
 
+        # Add to activity history and update dashboard
+        activity_history.append({
+            'activity': activity,
+            'confidence': float(max(pred)),
+            'timestamp': time.strftime('%H:%M:%S')
+        })
+        
+        socketio.emit('dashboard_prediction', {
+        'activity': activity,
+        'history': list(activity_history),
+        'confidence': float(max(pred))
+    })
+
     except Exception as e:
         logger.error(f"Error during prediction: {e}", exc_info=True)
 
@@ -170,6 +200,10 @@ def handle_connect():
 @socketio.on('disconnect')
 def handle_disconnect():
     logger.info("Client disconnected")
+    sid = request.sid
+    if sid in connected_devices:
+        connected_devices.remove(sid)
+    socketio.emit('device_update', {'count': len(connected_devices)})
 
 if __name__ == '__main__':
     if model is None:

@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HAR System Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        :root {
+            --primary: #2C3E50;
+            --secondary: #ECF0F1;
+            --accent: #3498DB;
+            --text: #2C3E50;
+            --background: #F8F9FA;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--background);
+            color: var(--text);
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: auto auto;
+            gap: 2rem;
+            height: calc(100vh - 4rem);
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .plots-container {
+            grid-column: 1 / -1;  /* Span full width */
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+        }
+
+        .plot-card {
+            height: 100%;
+        }
+
+        .plot-container {
+            width: 100%;
+            height: 400px;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        h2 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+
+        .activity {
+            font-size: 2rem;
+            text-align: center;
+            padding: 1.5rem;
+            background: var(--secondary);
+            border-radius: 8px;
+            margin: 1rem 0;
+            color: var(--primary);
+        }
+
+        #confidence {
+            text-align: center;
+            color: var(--accent);
+            font-size: 1.1rem;
+        }
+
+        #history {
+            height: 300px;
+            overflow-y: auto;
+            padding: 0.5rem;
+        }
+
+        #history div {
+            padding: 0.5rem;
+            margin: 0.25rem 0;
+            border-radius: 4px;
+            background: var(--secondary);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="card">
+            <h2>Current Activity</h2>
+            <div id="current-activity" class="activity">Waiting...</div>
+            <div id="confidence"></div>
+        </div>
+        <!-- <div class="card">
+            <h2>Connected Devices</h2>
+            <div id="devices">No devices connected</div>
+        </div> -->
+        <div class="card">
+            <h2>Activity History</h2>
+            <div id="history"></div>
+        </div>
+        <!-- <div class="card">
+            <h2>Accelerometer Data</h2>
+            <div id="acc-plot"></div>
+        </div>
+        <div class="card">
+            <h2>Gyroscope Data</h2>
+            <div id="gyro-plot"></div>
+        </div> -->
+        <div class="plots-container">
+            <div class="card plot-card">
+                <h2>Accelerometer Data</h2>
+                <div id="acc-plot" class="plot-container"></div>
+            </div>
+            <div class="card plot-card">
+                <h2>Gyroscope Data</h2>
+                <div id="gyro-plot" class="plot-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+           const socket = io();
+    let sensorData = {
+        acc: [[],[],[]],
+        gyro: [[],[],[]]
+    };
+    const plotLayout = {
+            autosize: true,
+            margin: { t: 30, l: 50, r: 20, b: 30 },
+            showlegend: true,
+            height: null  // Will be set by CSS
+        };
+
+    // Initialize accelerometer plot
+    const accPlot = document.getElementById('acc-plot');
+    Plotly.newPlot(accPlot, [
+        {
+            y: sensorData.acc[0],
+            name: 'X',
+            type: 'line',
+            line: {color: '#1f77b4'}
+        },
+        {
+            y: sensorData.acc[1],
+            name: 'Y',
+            type: 'line',
+            line: {color: '#ff7f0e'}
+        },
+        {
+            y: sensorData.acc[2],
+            name: 'Z',
+            type: 'line',
+            line: {color: '#2ca02c'}
+        }
+    ],  plotLayout);
+
+    // Initialize gyroscope plot
+    const gyroPlot = document.getElementById('gyro-plot');
+    Plotly.newPlot(gyroPlot, [
+        {
+            y: sensorData.gyro[0],
+            name: 'X',
+            type: 'line',
+            line: {color: '#1f77b4'}
+        },
+        {
+            y: sensorData.gyro[1],
+            name: 'Y',
+            type: 'line',
+            line: {color: '#ff7f0e'}
+        },
+        {
+            y: sensorData.gyro[2],
+            name: 'Z',
+            type: 'line',
+            line: {color: '#2ca02c'}
+        }
+    ],  plotLayout);
+
+    socket.on('dashboard_sensor_update', (data) => {
+        // Update accelerometer data
+        sensorData.acc[0].push(data.acc[0]);
+        sensorData.acc[1].push(data.acc[1]);
+        sensorData.acc[2].push(data.acc[2]);
+
+        // Update gyroscope data
+        sensorData.gyro[0].push(data.gyro[0]);
+        sensorData.gyro[1].push(data.gyro[1]);
+        sensorData.gyro[2].push(data.gyro[2]);
+
+        // Limit data points
+        if (sensorData.acc[0].length > 50) {
+            sensorData.acc[0].shift();
+            sensorData.acc[1].shift();
+            sensorData.acc[2].shift();
+            sensorData.gyro[0].shift();
+            sensorData.gyro[1].shift();
+            sensorData.gyro[2].shift();
+        }
+
+        // Update both plots
+        Plotly.update(accPlot, {
+            y: [sensorData.acc[0], sensorData.acc[1], sensorData.acc[2]]
+        });
+        
+        Plotly.update(gyroPlot, {
+            y: [sensorData.gyro[0], sensorData.gyro[1], sensorData.gyro[2]]
+        });
+    });
+
+        socket.on('dashboard_prediction', (data) => {
+            // Update current activity
+            document.getElementById('current-activity').textContent = data.activity;
+            document.getElementById('confidence').textContent = 
+                `Confidence: ${(data.confidence * 100).toFixed(1)}%`;
+
+            // Update history
+            const history = document.getElementById('history');
+            history.innerHTML = data.history
+                .map(h => `<div>${h.timestamp} - ${h.activity} (${(h.confidence * 100).toFixed(1)}%)</div>`)
+                .join('');
+        });
+
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+
+        window.addEventListener('resize', () => {
+            Plotly.Plots.resize(accPlot);
+            Plotly.Plots.resize(gyroPlot);
+        });
+    </script>
+</body>
+</html>
