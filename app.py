@@ -212,6 +212,5 @@ if __name__ == '__main__':
         logger.info(f"Model loaded successfully. Input shape: {model.input_shape}")
     
     logger.info("Starting Flask app")
-    app.run(host='0.0.0.0', port=5000)
     socketio.start_background_task(check_for_timeout)
-    socketio.run(app, debug=True)
+    socketio.run(app, debug=True,host='0.0.0.0', port=5000)
